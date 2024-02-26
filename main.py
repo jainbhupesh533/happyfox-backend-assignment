@@ -53,43 +53,55 @@ class EmailProcessor:
         ''')
 		self.conn.commit()
 
+	def save_emails_to_database(self, emails):
+		for email in emails:
+			message_id = email['id']
+			snippet = email.get('snippet', '')
+			self.cursor.execute('''
+                INSERT INTO emails (message_id, snippet)
+                VALUES (?, ?)
+            ''', (message_id, snippet))
+		self.conn.commit()
+
 	def process_emails_based_on_rules(self):
 		rules = self.load_rules_from_json()
-		for rule in rules:
-			field = rule['Field']
-			predicate = rule['Predicate']
-			value = rule['Value']
-			condition_type = rule['Condition']
-			actions = rule['Actions']
-
-			query = self.construct_query(field, predicate, value)
-			self.cursor.execute(query)
-			emails_to_process = self.cursor.fetchall()
-
-			if condition_type == 'All':
-				if all(email for email in emails_to_process):
-					self.apply_actions(actions, emails_to_process)
-			elif condition_type == 'Any':
-				if any(email for email in emails_to_process):
-					self.apply_actions(actions, emails_to_process)
-
-	def construct_query(self, field, predicate, value):
-		if field == 'From':
-			if predicate == 'Contains':
-				return f"SELECT * FROM emails WHERE message_id LIKE '%{value}%'"
-			elif predicate == 'Does not Contain':
-				return f"SELECT * FROM emails WHERE message_id NOT LIKE '%{value}%'"
-			elif predicate == 'Equals':
-				return f"SELECT * FROM emails WHERE message_id = '{value}'"
-			elif predicate == 'Does not equal':
-				return f"SELECT * FROM emails WHERE message_id != '{value}'"
-
-	def apply_actions(self, actions, emails):
+		self.cursor.execute('SELECT * FROM emails')
+		emails = self.cursor.fetchall()
 		for email in emails:
-			if 'Mark as Read' in actions:
-				self.mark_as_read(email['message_id'])
-			if 'Move Message' in actions:
-				self.move_message(email['message_id'], rule['Destination'])
+			for rule in rules:
+				field = rule['Field']
+				predicate = rule['Predicate']
+				value = rule['Value']
+				actions = rule['Actions']
+				condition_type = rule.get('Condition', 'All')  # Default to 'All' if not specified
+
+				if condition_type == 'All':
+					if all(self.email_matches_rule(email, field, predicate, value) for email in emails):
+						self.apply_actions(actions, email)
+						break  # Once actions are applied for this email, break out of the loop
+				elif condition_type == 'Any':
+					if any(self.email_matches_rule(email, field, predicate, value) for email in emails):
+						self.apply_actions(actions, email)
+						break  # Once actions are applied for this email, break out of the loop
+
+	def email_matches_rule(self, email, field, predicate, value):
+		snippet = email[2]  # Snippet is at index 2 in the email tuple
+		if predicate == 'Contains':
+			return value in snippet
+		elif predicate == 'Does not Contain':
+			return value not in snippet
+		elif predicate == 'Equals':
+			return value == snippet
+		elif predicate == 'Does not equal':
+			return value != snippet
+		return False
+
+	def apply_actions(self, actions, email):
+		message_id = email[1]  # Message ID is at index 1 in the email tuple
+		if 'Mark as Read' in actions:
+			self.mark_as_read(message_id)
+		if 'Move Message' in actions:
+			self.move_message(message_id, email['Destination'])
 
 	def mark_as_read(self, message_id):
 		self.service.users().messages().modify(userId='me', id=message_id,
@@ -106,7 +118,14 @@ class EmailProcessor:
 
 def main():
 	email_processor = EmailProcessor()
+
+	# Step 1: Fetch all emails
 	emails = email_processor.fetch_emails()
+
+	# Step 2: Save emails in the database
+	email_processor.save_emails_to_database(emails)
+
+	# Step 3: Process emails based on rules
 	email_processor.process_emails_based_on_rules()
 
 

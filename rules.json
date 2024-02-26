@@ -1,0 +1,17 @@
+[
+    {
+        "Field": "From",
+        "Predicate": "Contains",
+        "Value": "example.com",
+        "Condition": "All",
+        "Actions": ["Mark as Read", "Move Message"],
+        "Destination": "some_folder"
+    },
+    {
+        "Field": "Subject",
+        "Predicate": "Equals",
+        "Value": "Important",
+        "Condition": "Any",
+        "Actions": ["Mark as Read"]
+    }
+]

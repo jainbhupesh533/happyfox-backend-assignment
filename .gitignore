@@ -1,0 +1,22 @@
+# Python Compiled Files
+*.pyc
+
+# Git related files
+*.orig
+
+# Environment Related Files
+.idea/
+lib/
+bin/
+local/
+logs/
+django-mongoadmin/
+djcelery/
+include/
+pip-uninstall
+share/
+venv/
+env/
+.env
+*migrations*
+*static*

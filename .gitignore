@@ -20,3 +20,5 @@ env/
 .env
 *migrations*
 *static*
+token.pickle
+credentials.json
